@@ -1,16 +1,125 @@
-# This is a sample Python script.
+import requests
+import json
+import influxdb_client
+from influxdb_client.client.write_api import SYNCHRONOUS
+from datetime import date
+import os
 
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+def execute_stock(symbol):
+    influx_frendly_data = lambda measurement_name, time_value, field_values, tag_values: {
+        "measurement": measurement_name,
+        "time": time_value,
+        "fields": field_values,
+        "tags": tag_values
+    }
+
+    api_key = os.environ.get('Api_Key')
+    function = os.environ.get('Fin_Stren_Function')
+    url = f"{os.environ.get('Fin_Stren_Provider')}?function={function}&symbol={symbol}&apikey={api_key}"
+
+    current_date = date.today().isoformat()
+
+    response = requests.get(url)
+    data = json.loads(response.text)
+
+    eps = data["EPS"]
+    pe_ratio = data["PERatio"]
+    roe = data["ReturnOnEquityTTM"]
+    div_yield = data["DividendYield"]
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
+    function = os.environ.get('Fin_BalSheet_Function')
+    url = f"{os.environ.get('Fin_BalSheet_Provider')}?function={function}&symbol={symbol}&apikey={api_key}"
 
+    response = requests.get(url)
+    data = json.loads(response.text)
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+    total_liabilities = float(data["annualReports"][0]["totalLiabilities"])
+    total_equity = float(data["annualReports"][0]["totalShareholderEquity"])
+    debt_to_equity = total_liabilities / total_equity
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    financial_strength = [
+        influx_frendly_data(
+            os.environ.get('Fin_Stren_Table'),
+            current_date,
+            {
+                "EPS": eps,
+                "PERatio": pe_ratio,
+                "ROE": roe,
+                "Divident_Yield": div_yield,
+                "Dept_To_Equity": debt_to_equity
+            },
+            {
+                "symbol": symbol
+            }
+        )
+    ]
+
+    url = os.environ.get('Fundamental_News_Provider')
+
+    querystring = {"category":"AAPL"}
+
+    headers = {
+        "X-RapidAPI-Key": os.environ.get('Fundamental_News_Key'),
+        "X-RapidAPI-Host": os.environ.get('Fundamental_News_Host')
+    }
+
+    response = requests.get(url, headers=headers, params=querystring)
+    data = json.loads(response.text)
+
+    news_list = [
+        influx_frendly_data(
+            os.environ.get('Fundamental_News_Table'),
+            current_date,
+            {
+                "Title": news_item['title'],
+                "Source": news_item['source']
+            },
+            {
+                "symbol": symbol
+            }
+        ) for news_item in data
+    ]
+
+    function = os.environ.get('Technical_Analysis_Function')
+    url = f"{os.environ.get('Technical_Analysis_Provider')}?function={function}&symbol={symbol}&outputsize=compact&apikey={api_key}"
+
+    response = requests.get(url)
+    data = json.loads(response.text)
+
+    technical_data = [
+        influx_frendly_data(
+            {os.environ.get('Technical_Analysis_Table')},
+            date,
+            {
+                "open": data["Time Series (Daily)"][date]['1. open'],
+                "high": data["Time Series (Daily)"][date]['2. high'],
+                "low": data["Time Series (Daily)"][date]['3. low'],
+                "close": data["Time Series (Daily)"][date]['4. close'],
+                "volume": data["Time Series (Daily)"][date]['5. volume']
+            },
+            {
+                "symbol": symbol
+            }
+        ) for date in data["Time Series (Daily)"]
+    ]
+
+    technical_data = technical_data[:20]
+    full_list = sum([financial_strength, news_list, technical_data[:30]], [])
+
+    token_val = os.environ.get('Influx_Token_Value')
+
+    client = influxdb_client.InfluxDBClient(url=os.environ.get('Influx_DB_URL'), token=token_val, org=os.environ.get('Influx_Org_Name'), verify_ssl=False)
+    write_api = client.write_api(write_options=SYNCHRONOUS)
+    batch_size = 1000
+    for i in range(0, len(full_list), batch_size):
+        batch_data = full_list[i:i + batch_size]
+        write_api.write(bucket=os.environ.get('Influx_Bucket_Name'), record=batch_data)
+    client.close()
+
+execute_stock("AAPL")
+"""
+df_stocks = pd.read_csv("stocks-list.csv")
+lst_stocks = list(df_stocks['Symbol'])
+[execute_stock(single_symbol) for single_symbol in lst_stocks]
+"""
