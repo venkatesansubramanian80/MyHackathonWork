@@ -5,19 +5,8 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from datetime import date
 import os
 
-def execute_stock(symbol):
-    influx_frendly_data = lambda measurement_name, time_value, field_values, tag_values: {
-        "measurement": measurement_name,
-        "time": time_value,
-        "fields": field_values,
-        "tags": tag_values
-    }
-
-    api_key = os.environ.get('Api_Key')
-    function = os.environ.get('Fin_Stren_Function')
+def financial_strength_retreival(symbol, influx_frendly_data, api_key, function, current_date):
     url = f"{os.environ.get('Fin_Stren_Provider')}?function={function}&symbol={symbol}&apikey={api_key}"
-
-    current_date = date.today().isoformat()
 
     response = requests.get(url)
     data = json.loads(response.text)
@@ -26,7 +15,6 @@ def execute_stock(symbol):
     pe_ratio = data["PERatio"]
     roe = data["ReturnOnEquityTTM"]
     div_yield = data["DividendYield"]
-
 
     function = os.environ.get('Fin_BalSheet_Function')
     url = f"{os.environ.get('Fin_BalSheet_Provider')}?function={function}&symbol={symbol}&apikey={api_key}"
@@ -54,11 +42,11 @@ def execute_stock(symbol):
             }
         )
     ]
+    return financial_strength
 
+def fundamental_analysis(symbol, current_date, influx_frendly_data):
     url = os.environ.get('Fundamental_News_Provider')
-
-    querystring = {"category":"AAPL"}
-
+    querystring = {"category": symbol}
     headers = {
         "X-RapidAPI-Key": os.environ.get('Fundamental_News_Key'),
         "X-RapidAPI-Host": os.environ.get('Fundamental_News_Host')
@@ -80,7 +68,9 @@ def execute_stock(symbol):
             }
         ) for news_item in data
     ]
+    return news_list
 
+def technical_analysis(symbol, influx_frendly_data, api_key):
     function = os.environ.get('Technical_Analysis_Function')
     url = f"{os.environ.get('Technical_Analysis_Provider')}?function={function}&symbol={symbol}&outputsize=compact&apikey={api_key}"
 
@@ -105,17 +95,35 @@ def execute_stock(symbol):
     ]
 
     technical_data = technical_data[:20]
-    full_list = sum([financial_strength, news_list, technical_data[:30]], [])
+    return technical_data
 
+def insert_into_influx(full_list):
     token_val = os.environ.get('Influx_Token_Value')
-
-    client = influxdb_client.InfluxDBClient(url=os.environ.get('Influx_DB_URL'), token=token_val, org=os.environ.get('Influx_Org_Name'), verify_ssl=False)
+    client = influxdb_client.InfluxDBClient(url=os.environ.get('Influx_DB_URL'), token=token_val,
+                                            org=os.environ.get('Influx_Org_Name'), verify_ssl=False)
     write_api = client.write_api(write_options=SYNCHRONOUS)
     batch_size = 1000
     for i in range(0, len(full_list), batch_size):
         batch_data = full_list[i:i + batch_size]
         write_api.write(bucket=os.environ.get('Influx_Bucket_Name'), record=batch_data)
     client.close()
+
+
+def execute_stock(symbol):
+    influx_frendly_data = lambda measurement_name, time_value, field_values, tag_values: {
+        "measurement": measurement_name,
+        "time": time_value,
+        "fields": field_values,
+        "tags": tag_values
+    }
+    api_key = os.environ.get('Api_Key')
+    function = os.environ.get('Fin_Stren_Function')
+    current_date = date.today().isoformat()
+    financial_strength = financial_strength_retreival(symbol, influx_frendly_data, api_key, function, current_date)
+    news_list = fundamental_analysis(symbol, current_date, influx_frendly_data)
+    technical_data = technical_analysis(symbol, influx_frendly_data, api_key)
+    full_list = sum([financial_strength, news_list, technical_data[:30]], [])
+    insert_into_influx(full_list)
 
 execute_stock("AAPL")
 """
