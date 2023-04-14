@@ -1,4 +1,4 @@
-# Project Green Parrort
+# Project Green Parrot
 
 Project Green Parrot is a stock picker application that helps investors analyze and predict the performance of stocks using machine learning algorithms.
 
