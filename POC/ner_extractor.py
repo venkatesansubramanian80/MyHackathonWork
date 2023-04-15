@@ -5,7 +5,7 @@ os.environ[os.environ.get('cert_file_default')] = os.environ.get('cert_file_name
 nltk.download('maxent_ne_chunker')
 
 # Sample text
-text = 'Text To Check'
+text = 'Text To Check '
 
 # Tokenize the text
 tokens = nltk.word_tokenize(text)
