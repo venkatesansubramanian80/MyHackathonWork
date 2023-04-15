@@ -3,7 +3,7 @@ from unittest.mock import patch, Mock
 import urllib.request
 import subprocess
 import os
-from main import financial_strength_retreival
+from main import financial_strength_retreival, fundamental_analysis
 
 class MainTestCase(unittest.TestCase):
 
@@ -35,3 +35,23 @@ class MainTestCase(unittest.TestCase):
         expected_response = {}
         financial_strength_results = financial_strength_retreival('Test_Symbol', self.influx_frendly_data, 'api_key', 'function', 'current_date')
         self.assertEquals(financial_strength_results, expected_response)
+
+    @patch('requests.get')
+    def test_fundamental_analysis(self, mock_get):
+        os.environ['Fundamental_News_Provider'] = ''
+        os.environ['Fundamental_News_Key'] = ''
+        os.environ['Fundamental_News_Host'] = ''
+        os.environ['Fundamental_News_Table'] = ''
+
+        mock_data = {}
+
+        mock_response = Mock()
+        mock_response.content = mock_data
+        mock_response.status_code = 200
+
+        mock_get.side_effect = [mock_response]
+
+        expected_response = {}
+        fundamental_analysis_val = fundamental_analysis('Test_Symbol', 'current_date', self.influx_frendly_data)
+
+        self.assertEquals(fundamental_analysis_val, expected_response)
