@@ -3,7 +3,7 @@ from unittest.mock import patch, Mock
 import urllib.request
 import subprocess
 import os
-from main import financial_strength_retreival, fundamental_analysis
+from main import financial_strength_retreival, fundamental_analysis, technical_analysis
 
 class MainTestCase(unittest.TestCase):
 
@@ -55,3 +55,21 @@ class MainTestCase(unittest.TestCase):
         fundamental_analysis_val = fundamental_analysis('Test_Symbol', 'current_date', self.influx_frendly_data)
 
         self.assertEquals(fundamental_analysis_val, expected_response)
+
+    @patch('requests.get')
+    def test_technical_analysis(self, mock_get):
+        os.environ['Technical_Analysis_Function'] = ''
+        os.environ['Technical_Analysis_Provider'] = ''
+        os.environ['Technical_Analysis_Table'] = ''
+
+        mock_data = {}
+
+        mock_response = Mock()
+        mock_response.content = mock_data
+        mock_response.status_code = 200
+
+        mock_get.side_effect = [mock_response]
+
+        expected_response = {}
+        tech_analysis_results = technical_analysis('Test_Symbol', self.influx_frendly_data, 'api_key')
+        self.assertEquals(tech_analysis_results, expected_response)
