@@ -125,9 +125,3 @@ def execute_stock(symbol):
     full_list = sum([financial_strength, news_list, technical_data[:30]], [])
     insert_into_influx(full_list)
 
-execute_stock("AAPL")
-"""
-df_stocks = pd.read_csv("stocks-list.csv")
-lst_stocks = list(df_stocks['Symbol'])
-[execute_stock(single_symbol) for single_symbol in lst_stocks]
-"""
