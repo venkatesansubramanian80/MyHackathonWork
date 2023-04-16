@@ -5,14 +5,15 @@ import subprocess
 import os
 from main import financial_strength_retreival, fundamental_analysis, technical_analysis
 
-class MainTestCase(unittest.TestCase):
 
+class MainTestCase(unittest.TestCase):
     influx_frendly_data = lambda measurement_name, time_value, field_values, tag_values: {
         "measurement": measurement_name,
         "time": time_value,
         "fields": field_values,
         "tags": tag_values
     }
+
     @patch('requests.get')
     def test_financial_strength_retreival(self, mock_get):
         os.environ['Fin_Stren_Provider'] = ''
@@ -33,7 +34,8 @@ class MainTestCase(unittest.TestCase):
         mock_get.side_effect = [mock_response1, mock_response2]
 
         expected_response = {}
-        financial_strength_results = financial_strength_retreival('Test_Symbol', self.influx_frendly_data, 'api_key', 'function', 'current_date')
+        financial_strength_results = financial_strength_retreival('Test_Symbol', self.influx_frendly_data, 'api_key',
+                                                                  'function', 'current_date')
         self.assertEquals(financial_strength_results, expected_response)
 
     @patch('requests.get')
