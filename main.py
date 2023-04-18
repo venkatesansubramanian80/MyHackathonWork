@@ -64,7 +64,8 @@ def fundamental_analysis(symbol, current_date, influx_frendly_data):
                 "Source": news_item['source']
             },
             {
-                "symbol": symbol
+                "symbol": symbol,
+                "guid": news_item['guid']
             }
         ) for news_item in data
     ]
